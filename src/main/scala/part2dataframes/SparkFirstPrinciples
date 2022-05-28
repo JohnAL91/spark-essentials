@@ -1,0 +1,24 @@
+Spark First Principles
+
+Spark is a unified computing engine
+- consistent, composable language in multiple languages (scala, java, python, r)
+- optimization across different libraries (not only in one at a time)
+
+Computing engine = detached from data storage & io
+
+Libraries
+- Standard: Spark SQL, MLib, Streaming, GraphX
+- Hundreds of open source third party libraries
+
+Context of big data
+- Computing vs data
+- CPUs only incrementally faster
+- data storage keeps getting better and cheaper
+
+Spark started 2009 and is the most popular data processing engine
+Spark is not part of hadoop.
+
+Spark Architecture
+- Low-level APIs: RDDs (Resilient distributed datasets) & Distributed variables
+- High-level APIs: DataFrames, Datasets, Spar SQL
+- Applications: Streaming, ML, GraphX, Other Libraries
