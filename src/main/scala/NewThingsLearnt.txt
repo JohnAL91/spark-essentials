@@ -1,0 +1,115 @@
+* The types of dataframes like StringType, FloatType etc. are case objects
+
+* You can choose columns in many ways
+
+        carsDF.col("name"),
+        col("Acceleration"),
+        column("Weight_in_lbs"), // col / columns do the exact same thing
+        'Year, // Scala Symbol, auto-converted to column
+        $"HorsePower", // fancier interpolated string, returns a Column object
+        expr("Origin")
+
+* There are aggregations like "mean" and "stddev"
+
+* There are left_semi and right_semi joins which works like left and right join, but only includes the data from
+  the one table, opposite of for instance left_anti
+
+* Columns are a subtype of expressions. You can save expressions in columns like below. You can then also select one of
+  those expressions, and it will return a boolean from it.
+
+      val dramaFilter: Column = col("Major_Genre") equalTo "Drama"
+      val goodRatingFilter: Column = col("IMDB_Rating") > 7.0
+      val preferredFilter = dramaFilter and goodRatingFilter
+
+      val moviesWithGoodnessFlagsDF = moviesDF.select($"Title", preferredFilter.as("good_movie"))
+      moviesWithGoodnessFlagsDF.where("good_movie")
+
+* You can calculate the correlation between values simply like so:
+
+    println(moviesDF.stat.corr("Rotten_Tomatoes_Rating", "IMDB_Rating"))
+
+* You can use regex_extract like below, using regex to extract words from a column
+
+      val regexString = "volkswagen|vw"
+      carsDF.select(
+        $"Name",
+        regexp_extract($"Name", regexString, 0).as("regex_extract")
+      )
+
+* You can combine filters like so:
+
+    def getCarNames: List[String] = List("Volkswagen", "Mercedes-Benz", "Ford")
+    val carNameFilters = getCarNames.map(_.toLowerCase).map($"Name".contains(_))
+    val bigFilter = carNameFilters.fold(lit(false))((x, y) => x or y)
+    carsDF.filter(bigFilter)
+
+* You can make list/array of things using struct. You can also get nestled things by .getField(""):
+
+  moviesDF
+    .select($"Title", struct($"US_Gross", $"Worldwide_Gross").as("Profit"))
+    .select($"Title", $"Profit".getField("US_Gross")).as("")
+    .show()
+
+* You can drop duplicates base on a subset of columns with .dropDuplicates()
+
+* You can work with Arrays / Structures like so:
+
+      val moviesWithWords = moviesDF.select($"Title", split($"Title", " |,").as("Title_Words"))
+      moviesWithWords.select(
+        $"Title",
+        expr("Title_words[0]"), // Gives the first word
+        size($"Title_Words"), // Gives the number of words
+        array_contains($"Title_Words", "Love") // Contains "love" as boolean
+      ).show()
+
+* When giving a schema (StructType) and setting Nullable=false/true, that is actually not a constraint -
+    but rather a marker for Spark to optimize for nulls. Can lead to exceptions or data errors if broken
+
+* When ordering, there are desc_nulls_last / and desc_nulls_first (same for asc) that decides where
+ then null values goes in the ordering
+
+* DataFrame .na functions to handle null values - like drop() / fill() / replace(). df.na.drop() returns a new
+  DataFrame that drops rows containing any null or NaN values. df.na.drop("all") will drop the row if all cols
+  include null values. Also work with specifying column names.
+
+* More complex expressions for dealing with null values:
+
+    moviesDF.selectExpr(
+        "Title",
+        "Rotten_Tomatoes_Rating",
+        "IMDB_Rating",
+        "ifnull(Rotten_Tomatoes_Rating, IMDB_Rating * 10) as ifnull", // ifnull() similar to coalesce
+        "nvl(Rotten_Tomatoes_Rating, IMDB_Rating * 10) as nvl", // same thing
+        "nullif(Rotten_Tomatoes_Rating, IMDB_Rating * 10) as nullif", // returns null if the two values are EQUAL, else first value
+        "nvl2(Rotten_Tomatoes_Rating, IMDB_Rating * 10, 0.0) as nvl2" // if(first != null) second else third
+      ).show()
+
+* DataFrames are just a type alias for Dataset of Row: Dataset[Row]. You can use convert dataframes into Datasets by
+  using encoders (supplied by import.spark.implicits_). Datasets can be used as we are used to in scala code.
+
+      case class Car(
+                      Name: String,
+                      Miles_per_Gallon: Option[Double], // To enable null values, use option. Else constraint not null.
+                      Cylinders: Long,
+                      Displacement: Double,
+                      Horsepower: Option[Long],
+                      Weight_in_lbs: Long,
+                      Acceleration: Double,
+                      Year: String,
+                      Origin: String
+                    )
+
+      //  implicit val carEncoder = Encoders.product[Car] // Not required since we get it from next row import spark.implicits._ (Case classes extends product)
+      import spark.implicits._ // this imports all the encoders needed
+      val carsDS = carsDF.as[Car]
+      numbersDS.filter(_ < 100).show()
+      numbersDS.map(car => car.Horsepower * 10).show()
+
+* You can do joins and grouping on Datasets using .joinWith and .groupByKey
+
+      val myJoin: Dataset[(Guitar, GuitarPlayer)] = guitarsDS.joinWith(guitarPlayerDS, array_contains(guitarPlayerDS("guitars"), guitarsDS("id")), "outer")
+    
+      // Groupings
+      val carsGroupedByOrigin: KeyValueGroupedDataset[String, Car] = carsDS.groupByKey(_.Origin)
+      val myCount: Dataset[(String, Long)] = carsGroupedByOrigin.count()
+      myCount.show()
