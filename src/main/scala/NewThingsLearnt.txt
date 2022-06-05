@@ -108,8 +108,29 @@
 * You can do joins and grouping on Datasets using .joinWith and .groupByKey
 
       val myJoin: Dataset[(Guitar, GuitarPlayer)] = guitarsDS.joinWith(guitarPlayerDS, array_contains(guitarPlayerDS("guitars"), guitarsDS("id")), "outer")
-    
+
       // Groupings
       val carsGroupedByOrigin: KeyValueGroupedDataset[String, Car] = carsDS.groupByKey(_.Origin)
       val myCount: Dataset[(String, Long)] = carsGroupedByOrigin.count()
       myCount.show()
+
+* Spark has a "Spark Shell" in which you can perform SQL in the command promt. There are MANAGED and EXTERNAL tables in this:
+  Managed: Spark is in charge of the metadata + the data. If you drop the table, you lose the data.
+  External (unmanaged): Spark is in charge of the metadata only. If you drop the table, you keep the data.
+
+* You can work with Spark similar to a database with SQL, meaning you can save tables as below. You can set the database path
+  in the config when creating the spark sessions.
+
+    val spark = SparkSession.builder()
+        .appName("Spark QL practice")
+        .config("spark.sql.legacy.timeParserPolicy", "LEGACY")
+        .config("spark.sql.warehouse.dir", "src/main/resources/warehouse") // SETS THE SOURCE OF NEW "DATABASES" USING SPARK SQL. Default is /spark-warehouse.
+        .config("spark.master", "local")
+        .getOrCreate()
+
+    val moviesDF = spark.read.json("src/main/resources/data/movies.json")
+    moviesDF.write.mode(SaveMode.Overwrite).option("path", s"src/main/resources/warehouse/rtjvm.db/movies").saveAsTable("movies") // Saves the table to /warehouse/rtjvm.db/movies
+
+    Not sure how we can read from it again however.
+
+* RDD - Resilient Distributed Datasets - are typed like datasets
